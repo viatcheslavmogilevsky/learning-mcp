@@ -2,10 +2,9 @@
 
 ## Installation
 
-1. Install python, uv
+1. Install python, [uv](https://github.com/astral-sh/uv)
+    * Get full path to `uv`: `which uv`
 2. Configure Claude Desktop (on macOS, the config file path usually is `~/Library/Application\ Support/Claude/claude_desktop_config.json`)
-
-config example:
 
 ```json
 {
@@ -24,3 +23,10 @@ config example:
 ```
 
 3. Restart Claude Desktop app
+    * make sure there aren't any errors
+4. Example prompt: `What’s the weather in Palo Alto, CA?`
+
+
+## References
+
+* [MCP Quickstart guide](https://modelcontextprotocol.io/quickstart/server)
