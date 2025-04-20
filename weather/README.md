@@ -29,4 +29,4 @@
 
 ## References
 
-* [MCP Quickstart guide](https://modelcontextprotocol.io/quickstart/server)
+* [MCP Quickstart guide (server)](https://modelcontextprotocol.io/quickstart/server)
