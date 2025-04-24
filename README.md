@@ -8,3 +8,7 @@
 ## MCP clients
 
 * `./mcp-example-client` - from https://modelcontextprotocol.io/quickstart/client
+
+## Miscellaneous
+
+* `./delimited-continuation-simple-example` - from https://knazarov.com/posts/purity_delimited_continuations_and_io/
