@@ -1,3 +1,6 @@
+# original snippet is from https://knazarov.com/posts/purity_delimited_continuations_and_io/
+
+
 # Creates a specific IO operation and yields it, to
 # be catched by the outside IO loop
 def IO(io_type, *params):
@@ -14,7 +17,7 @@ def count(x, n=None):
         yield from IO("print", x)
         yield from count(x+1, n)
 
-computation = count(1)
+computation = count(0)
 
 while True:
     try:
@@ -26,4 +29,4 @@ while True:
     if io["io_type"] == "print":
         print(io["params"][0])
     elif io["io_type"] == "read":
-        computation.send(input())
+        computation.send(input("Specify n:"))
