@@ -27,4 +27,4 @@ Not ready :)
 ## References
 
 * [MCP Quickstart guide (client)](https://modelcontextprotocol.io/quickstart/client)
-* [Konstantin Nazarov: Purity, delimited continuations and I/O]](https://knazarov.com/posts/purity_delimited_continuations_and_io/))
+* [Konstantin Nazarov: Purity, delimited continuations and I/O](https://knazarov.com/posts/purity_delimited_continuations_and_io/)
