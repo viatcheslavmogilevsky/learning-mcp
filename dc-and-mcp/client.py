@@ -39,12 +39,11 @@ class StdioMCPClient:
         # print("\nConnected to server with tools:", [tool.name for tool in self.tools])
         return self.tools
 
-    def have_the_tool(tool_name) -> bool:
+    def have_the_tool(self, tool_name) -> bool:
         return tool_name in [tool.name for tool in self.tools]
 
-    async def process_tool(tool_name, tool_args) -> str:
+    async def process_tool(self, tool_name, tool_args) -> str:
         result = await self.session.call_tool(tool_name, tool_args)
-
         return result.content
 
     async def cleanup(self):
@@ -82,12 +81,10 @@ async def main():
     all_tools = dict()
     stdio_clients = []
 
-    tools_pattern = r'^/(describe|generate)_tool\s+([a-z_]+)(\s+.+)?'
+    tools_pattern = r'^/(describe|generate|call)_tool\s+([a-z_]+)(\s+.+)?'
+    call_tool_arg_pattern = r'([a-z_]+)(:number)?=(.+)'
     launch_stdio_pattern = r'^/launch_stdio\s(.+)'
-    stdio_args_delimeter = r'(?<!\\)\s+'
-
-    # TODO: think => tool providers & tools
-    # TODO: Garbage collection for stdio processes
+    args_delimeter = r'(?<!\\)\s+'
 
     print("\nSimple dummy Claude client Started!")
     print("Type your queries or '/quit' to exit.")
@@ -113,8 +110,46 @@ async def main():
 
                     if tools_cmd == 'describe':
                         if tools_args[0] in all_tools:
-                            pprint.pprint(all_tools[tools_args[0]])
-                            pprint.pprint(all_tools[tools_args[0]].inputSchema)
+                            print("name:")
+                            print(tools_args[0])
+                            print("description:")
+                            print(all_tools[tools_args[0]].description)
+                            print("inputSchema:")
+                            pprint.pprint(all_tools[tools_args[0]].inputSchema, indent=2)
+                        else:
+                            print(f"Tool with name \"{tools_args[0]}\" not found")
+
+                    if tools_cmd == "call":
+                        if tools_args[0] in all_tools:
+                            call_input = dict()
+                            call_tool_args = re.split(args_delimeter, tools_args[1].strip())
+                            for call_tool_arg in call_tool_args:
+                                call_tool_arg_match = re.search(call_tool_arg_pattern, call_tool_arg)
+                                if call_tool_arg_match:
+                                    input_name = call_tool_arg_match.group(1)
+                                    input_value = call_tool_arg_match.group(3)
+                                    if call_tool_arg_match.group(2):
+                                        if "." in input_value:
+                                            call_input[input_name] = float(input_value)
+                                        else:
+                                            call_input[input_name] = int(input_value)
+                                    else:
+                                        call_input[input_name] = input_value
+                                else:
+                                    print(f"\"{call_tool_arg}\" cannot be parsed for tool call input")
+
+                            found_stdio_client = None
+                            for stdio_client_elem in stdio_clients:
+                                if stdio_client_elem.have_the_tool(tools_args[0]):
+                                    found_stdio_client = stdio_client_elem
+                                    break
+
+                            if found_stdio_client:
+                                result = await found_stdio_client.process_tool(tools_args[0], call_input)
+                                print(result)
+                            else:
+                                print("No suitable stdio client found")
+
                         else:
                             print(f"Tool with name \"{tools_args[0]}\" not found")
 
@@ -126,7 +161,7 @@ async def main():
                 launch_stdio_match = re.search(launch_stdio_pattern, lower_query)
 
                 if launch_stdio_match:
-                    launch_stdio_args = re.split(stdio_args_delimeter, launch_stdio_match.group(1))
+                    launch_stdio_args = re.split(args_delimeter, launch_stdio_match.group(1))
 
                     if len(launch_stdio_args) < 2:
                         print("/enable_tool command requires at least two additional agruments for stdio: /launch_stdio CWD CMD [CMD_ARG...]")
