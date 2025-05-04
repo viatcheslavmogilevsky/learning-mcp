@@ -9,6 +9,7 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 
 import re
+import pprint
 
 load_dotenv()  # load environment variables from .env
 
@@ -23,7 +24,7 @@ class StdioMCPClient:
         server_params = StdioServerParameters(
             command=cmd,
             args=cmd_args,
-            cwd=cmd,
+            cwd=cwd,
             env=None
         )
 
@@ -31,7 +32,7 @@ class StdioMCPClient:
         self.stdio, self.write = stdio_transport
         self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
 
-        await self.session.initialize()
+        await asyncio.wait_for(self.session.initialize(), timeout=10)
 
         response = await self.session.list_tools()
         self.tools = response.tools
@@ -45,6 +46,9 @@ class StdioMCPClient:
         result = await self.session.call_tool(tool_name, tool_args)
 
         return result.content
+
+    async def cleanup(self):
+        await self.exit_stack.aclose()
 
 
 # Simple dummy Claude client with no tools
@@ -72,68 +76,90 @@ class ClaudeClient:
         return "\n".join(final_text)
 
 
+
 async def main():
     claude_client = ClaudeClient()
+    all_tools = dict()
+    stdio_clients = []
 
-    all_tools = []
+    tools_pattern = r'^/(describe|generate)_tool\s+([a-z_]+)(\s+.+)?'
+    launch_stdio_pattern = r'^/launch_stdio\s(.+)'
+    stdio_args_delimeter = r'(?<!\\)\s+'
 
-    # describe_tool_pattern = r'^/describe_tool\s+(.+)'
-    # enable_tool_pattern = r'^/enable_tool\s+(stdio|generate)\s+(.+)'
-    # delete_tool_pattern = r'^/disable_tool\s+(.+)'
-
-    cmd_with_args_pattern = r'^/(describe|enable|disable)_tool\s+(.+)'
-    enable_tool_args_pattern = r'^(stdio|generate)\s+(.+)'
-
+    # TODO: think => tool providers & tools
     # TODO: Garbage collection for stdio processes
-
 
     print("\nSimple dummy Claude client Started!")
     print("Type your queries or '/quit' to exit.")
-    while True:
-        try:
-            query = input("\nQuery: ").strip()
+    try:
+        while True:
+            try:
+                query = input("\nQuery: ").strip()
 
-            lower_query = query.lower()
+                lower_query = query.lower()
 
-            if lower_query == '/quit':
-                break
+                if lower_query == '/quit':
+                    break
 
-            if lower_query == '/list_tools'
-                print("\n".join([tool.name for tool in all_tools]))
-                continue
+                if lower_query == '/list_tools':
+                    print("\n".join(all_tools.keys()))
+                    continue
 
-            match = re.search(cmd_with_args_pattern, lower_query)
-            cmd = match.group(1)
-            cmd_args = match.group(2)
+                tools_match = re.search(tools_pattern, lower_query)
 
-            if cmd == 'describe':
-                found = [tool for tool in all_tools if tool.name == cmd_args]
-                if len(found) > 0:
-                    print(found[0])
-                else:
-                    print(f"Tool with name \"{cmd_args}\" not found")
-                continue
+                if tools_match:
+                    tools_cmd = tools_match.group(1)
+                    tools_args = [tools_match.group(2), tools_match.group(3)]
+
+                    if tools_cmd == 'describe':
+                        if tools_args[0] in all_tools:
+                            pprint.pprint(all_tools[tools_args[0]])
+                            pprint.pprint(all_tools[tools_args[0]].inputSchema)
+                        else:
+                            print(f"Tool with name \"{tools_args[0]}\" not found")
+
+                    if tools_cmd == "generate":
+                        print("Tool generation is not supported yet :)")
+
+                    continue
+
+                launch_stdio_match = re.search(launch_stdio_pattern, lower_query)
+
+                if launch_stdio_match:
+                    launch_stdio_args = re.split(stdio_args_delimeter, launch_stdio_match.group(1))
+
+                    if len(launch_stdio_args) < 2:
+                        print("/enable_tool command requires at least two additional agruments for stdio: /launch_stdio CWD CMD [CMD_ARG...]")
+                    else:
+                        new_stdio_client = StdioMCPClient()
+                        try:
+                            new_tools = await new_stdio_client.connect_to_server(launch_stdio_args[0], launch_stdio_args[1], launch_stdio_args[2:])
+                            for new_tool in new_tools:
+                                if new_tool.name in all_tools:
+                                    raise Exception(f"Tool #{new_tool.name} is already exists")
+
+                            for new_tool in new_tools:
+                                all_tools[new_tool.name] = new_tool
+
+                            stdio_clients.append(new_stdio_client)
+
+                        except Exception as e:
+                            print(f"Error occurred: {e}")
+                            await new_stdio_client.cleanup()
+
+                    continue
+
+                print("User prompts not supported yet :)")
 
 
-            # TODO: if cmd == 'enable':
-            # TODO: if cmd == 'disable'
 
+            except Exception as e:
+                print(f"\nError: {str(e)}")
 
+    finally:
+        for client in stdio_clients:
+            await client.cleanup()
 
-            response = await claude_client.process_query(query)
-            print("\n" + response)
-
-        except Exception as e:
-            print(f"\nError: {str(e)}")
-
-
-	# print("Hello!")
-    # client = MCPClient()
-    # try:
-    #     await client.connect_to_server(sys.argv[1])
-    #     await client.chat_loop()
-    # finally:
-    #     await client.cleanup()
 
 if __name__ == "__main__":
     import sys
