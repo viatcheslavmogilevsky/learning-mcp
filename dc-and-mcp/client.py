@@ -9,7 +9,7 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 
 import re
-import pprint
+import json
 
 load_dotenv()  # load environment variables from .env
 
@@ -95,6 +95,9 @@ async def main():
 
                 lower_query = query.lower()
 
+                if lower_query == '':
+                    continue
+
                 if lower_query == '/quit':
                     break
 
@@ -115,7 +118,7 @@ async def main():
                             print("description:")
                             print(all_tools[tools_args[0]].description)
                             print("inputSchema:")
-                            pprint.pprint(all_tools[tools_args[0]].inputSchema, indent=2)
+                            print(json.dumps(all_tools[tools_args[0]].inputSchema, indent=2))
                         else:
                             print(f"Tool with name \"{tools_args[0]}\" not found")
 
@@ -146,7 +149,12 @@ async def main():
 
                             if found_stdio_client:
                                 result = await found_stdio_client.process_tool(tools_args[0], call_input)
-                                print(result)
+                                print("type:")
+                                print(result.type)
+                                print("text:")
+                                print(result.text)
+                                print("annotations:")
+                                print(result.annotations)
                             else:
                                 print("No suitable stdio client found")
 
@@ -164,7 +172,7 @@ async def main():
                     launch_stdio_args = re.split(args_delimeter, launch_stdio_match.group(1))
 
                     if len(launch_stdio_args) < 2:
-                        print("/enable_tool command requires at least two additional agruments for stdio: /launch_stdio CWD CMD [CMD_ARG...]")
+                        print("/launch_stdio command requires at least two additional agruments for stdio: /launch_stdio CWD CMD [CMD_ARG...]")
                     else:
                         new_stdio_client = StdioMCPClient()
                         try:
@@ -184,6 +192,7 @@ async def main():
 
                     continue
 
+                print(f"You're typed \"{lower_query}\"")
                 print("User prompts not supported yet :)")
 
 
