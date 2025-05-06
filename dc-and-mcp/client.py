@@ -54,25 +54,32 @@ class StdioMCPClient:
 class ClaudeClient:
     def __init__(self):
         self.anthropic = Anthropic()
+        self.messages = []
 
+    def append_to_messages(self, message):
+        self.messages.append(message)
 
-    async def process_query(self, query: str, tools=[]) -> str:
-        messages = [
-            {
-                "role": "user",
-                "content": query
-            }
-        ]
+    def flush_messages(self):
+        self.messages.clear()
+
+    async def process_query(self, tools=[]) -> str:
+        available_tools = [{
+            "name": tool.name,
+            "description": tool.description,
+            "input_schema": tool.inputSchema
+        } for tool in tools]
 
         response = self.anthropic.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=1000,
-            messages=messages,
-            tools=tools
+            messages=self.messages,
+            tools=available_tools
         )
 
-        final_text = [content.text for content in response.content]
-        return "\n".join(final_text)
+        return response.content
+
+        # final_text = [content.text for content in response.content]
+        # return "\n".join(final_text)
 
 
 
@@ -192,8 +199,21 @@ async def main():
 
                     continue
 
-                print(f"You're typed \"{lower_query}\"")
-                print("User prompts not supported yet :)")
+                # print(f"You're typed \"{lower_query}\"")
+                # print("User prompts not supported yet :)")
+                claude_client.append_to_messages({
+                    "role": "user",
+                    "content": query
+                })
+                response = await claude_client.process_query(all_tools.values())
+                print("response:")
+                print(response)
+                # print(json.dumps(response, indent=2))
+                claude_client.flush_messages()
+
+
+
+
 
 
 
