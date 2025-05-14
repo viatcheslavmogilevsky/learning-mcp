@@ -76,10 +76,10 @@ class ClaudeClient:
             tools=available_tools
         )
 
-        return response.content
+        print("claude client gets response:")
+        print(response)
 
-        # final_text = [content.text for content in response.content]
-        # return "\n".join(final_text)
+        return response.content
 
 
 
@@ -95,6 +95,10 @@ async def main():
 
     print("\nSimple dummy Claude client Started!")
     print("Type your queries or '/quit' to exit.")
+
+    # I-AM-HERE: detect impure parts (with side effects)
+    # NEXT-TO: to delimit them!
+
     try:
         while True:
             try:
@@ -156,12 +160,14 @@ async def main():
 
                             if found_stdio_client:
                                 result = await found_stdio_client.process_tool(tools_args[0], call_input)
+                                # print("result as is:")
+                                # print(result)
                                 print("type:")
-                                print(result.type)
+                                print(result[0].type)
                                 print("text:")
-                                print(result.text)
+                                print(result[0].text)
                                 print("annotations:")
-                                print(result.annotations)
+                                print(result[0].annotations)
                             else:
                                 print("No suitable stdio client found")
 
@@ -199,22 +205,49 @@ async def main():
 
                     continue
 
-                # print(f"You're typed \"{lower_query}\"")
-                # print("User prompts not supported yet :)")
+                claude_client.flush_messages()
                 claude_client.append_to_messages({
                     "role": "user",
                     "content": query
                 })
-                response = await claude_client.process_query(all_tools.values())
-                print("response:")
-                print(response)
-                # print(json.dumps(response, indent=2))
-                claude_client.flush_messages()
+                continue_loop = True
+                while continue_loop:
+                    response = await claude_client.process_query(all_tools.values())
+                    continue_loop = False
+                    assistant_message_content = []
+                    for content in response:
+                        assistant_message_content.append(content)
+                        if content.type == 'text':
+                            pass
+                        elif content.type == 'tool_use':
+                            tool_name = content.name
+                            tool_args = content.input
 
+                            found_stdio_client = None
+                            for stdio_client_elem in stdio_clients:
+                                if stdio_client_elem.have_the_tool(tool_name):
+                                    found_stdio_client = stdio_client_elem
+                                    break
+                            if found_stdio_client:
+                                result = await found_stdio_client.process_tool(tool_name, tool_args)
+                            else:
+                                raise Exception(f"No suitable stdio client found for tool: #{tool_name}")
 
-
-
-
+                            claude_client.append_to_messages({
+                                "role": "assistant",
+                                "content": assistant_message_content
+                            })
+                            claude_client.append_to_messages({
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "tool_result",
+                                        "tool_use_id": content.id,
+                                        "content": result
+                                    }
+                                ]
+                            })
+                            continue_loop = True
 
 
             except Exception as e:
