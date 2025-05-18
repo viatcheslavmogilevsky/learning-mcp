@@ -76,9 +76,6 @@ class ClaudeClient:
             tools=available_tools
         )
 
-        print("claude client gets response:")
-        print(response)
-
         return response.content
 
 
@@ -93,16 +90,13 @@ async def main():
     launch_stdio_pattern = r'^/launch_stdio\s(.+)'
     args_delimeter = r'(?<!\\)\s+'
 
-    print("\nSimple dummy Claude client Started!")
-    print("Type your queries or '/quit' to exit.")
-
-    # I-AM-HERE: detect impure parts (with side effects)
-    # NEXT-TO: to delimit them!
+    print("\nSimple dummy Claude client Started!") # <<======== OUTPUT
+    print("Type your queries or '/quit' to exit.") # <<======== OUTPUT
 
     try:
         while True:
             try:
-                query = input("\nQuery: ").strip()
+                query = input("\nQuery: ").strip() # <<======== INPUT (main context)
 
                 lower_query = query.lower()
 
@@ -113,7 +107,7 @@ async def main():
                     break
 
                 if lower_query == '/list_tools':
-                    print("\n".join(all_tools.keys()))
+                    print("\n".join(all_tools.keys())) # <<======== OUTPUT
                     continue
 
                 tools_match = re.search(tools_pattern, lower_query)
@@ -124,14 +118,14 @@ async def main():
 
                     if tools_cmd == 'describe':
                         if tools_args[0] in all_tools:
-                            print("name:")
-                            print(tools_args[0])
-                            print("description:")
-                            print(all_tools[tools_args[0]].description)
-                            print("inputSchema:")
-                            print(json.dumps(all_tools[tools_args[0]].inputSchema, indent=2))
+                            print("name:")  # <<======== OUTPUT
+                            print(tools_args[0]) # <<======== OUTPUT
+                            print("description:") # <<======== OUTPUT
+                            print(all_tools[tools_args[0]].description) # <<======== OUTPUT
+                            print("inputSchema:") # <<======== OUTPUT
+                            print(json.dumps(all_tools[tools_args[0]].inputSchema, indent=2)) # <<======== OUTPUT
                         else:
-                            print(f"Tool with name \"{tools_args[0]}\" not found")
+                            print(f"Tool with name \"{tools_args[0]}\" not found") # <<======== OUTPUT
 
                     if tools_cmd == "call":
                         if tools_args[0] in all_tools:
@@ -150,7 +144,7 @@ async def main():
                                     else:
                                         call_input[input_name] = input_value
                                 else:
-                                    print(f"\"{call_tool_arg}\" cannot be parsed for tool call input")
+                                    print(f"\"{call_tool_arg}\" cannot be parsed for tool call input") # <<======== OUTPUT
 
                             found_stdio_client = None
                             for stdio_client_elem in stdio_clients:
@@ -159,23 +153,23 @@ async def main():
                                     break
 
                             if found_stdio_client:
-                                result = await found_stdio_client.process_tool(tools_args[0], call_input)
+                                result = await found_stdio_client.process_tool(tools_args[0], call_input) # <<======== CALL_TOOL
                                 # print("result as is:")
                                 # print(result)
-                                print("type:")
-                                print(result[0].type)
-                                print("text:")
-                                print(result[0].text)
-                                print("annotations:")
-                                print(result[0].annotations)
+                                print("type:") # <<======== OUTPUT
+                                print(result[0].type) # <<======== OUTPUT
+                                print("text:") # <<======== OUTPUT
+                                print(result[0].text) # <<======== OUTPUT
+                                print("annotations:") # <<======== OUTPUT
+                                print(result[0].annotations) # <<======== OUTPUT
                             else:
-                                print("No suitable stdio client found")
+                                print("No suitable stdio client found") # <<======== OUTPUT
 
                         else:
-                            print(f"Tool with name \"{tools_args[0]}\" not found")
+                            print(f"Tool with name \"{tools_args[0]}\" not found") # <<======== OUTPUT
 
                     if tools_cmd == "generate":
-                        print("Tool generation is not supported yet :)")
+                        print("Tool generation is not supported yet :)") # <<======== OUTPUT
 
                     continue
 
@@ -185,34 +179,34 @@ async def main():
                     launch_stdio_args = re.split(args_delimeter, launch_stdio_match.group(1))
 
                     if len(launch_stdio_args) < 2:
-                        print("/launch_stdio command requires at least two additional agruments for stdio: /launch_stdio CWD CMD [CMD_ARG...]")
+                        print("/launch_stdio command requires at least two additional agruments for stdio: /launch_stdio CWD CMD [CMD_ARG...]") # <<======== OUTPUT
                     else:
                         new_stdio_client = StdioMCPClient()
                         try:
-                            new_tools = await new_stdio_client.connect_to_server(launch_stdio_args[0], launch_stdio_args[1], launch_stdio_args[2:])
+                            new_tools = await new_stdio_client.connect_to_server(launch_stdio_args[0], launch_stdio_args[1], launch_stdio_args[2:]) # <<======== CONNECT_MCP_SERVER
                             for new_tool in new_tools:
                                 if new_tool.name in all_tools:
-                                    raise Exception(f"Tool #{new_tool.name} is already exists")
+                                    raise Exception(f"Tool #{new_tool.name} is already exists") # <<======== EXCEPTION
 
                             for new_tool in new_tools:
-                                all_tools[new_tool.name] = new_tool
+                                all_tools[new_tool.name] = new_tool  # <<======== MUTATE (all_tools)
 
-                            stdio_clients.append(new_stdio_client)
+                            stdio_clients.append(new_stdio_client) # <<======== MUTATE (stdio_clients)
 
                         except Exception as e:
-                            print(f"Error occurred: {e}")
-                            await new_stdio_client.cleanup()
+                            print(f"Error occurred: {e}") # <<======== OUTPUT
+                            await new_stdio_client.cleanup() # <<======== DISCONNECT_MCP_SERVER
 
                     continue
 
-                claude_client.flush_messages()
-                claude_client.append_to_messages({
+                claude_client.flush_messages()  # <<======== MUTATE (claude_client)
+                claude_client.append_to_messages({ # <<======== MUTATE:BEGIN (claude_client)
                     "role": "user",
                     "content": query
-                })
+                }) # <<======== MUTATE:END (claude_client)
                 continue_loop = True
                 while continue_loop:
-                    response = await claude_client.process_query(all_tools.values())
+                    response = await claude_client.process_query(all_tools.values()) # <<======== CALL_CLAUDE
                     continue_loop = False
                     assistant_message_content = []
                     for content in response:
@@ -229,15 +223,15 @@ async def main():
                                     found_stdio_client = stdio_client_elem
                                     break
                             if found_stdio_client:
-                                result = await found_stdio_client.process_tool(tool_name, tool_args)
+                                result = await found_stdio_client.process_tool(tool_name, tool_args) # <<======== CALL_TOOL
                             else:
-                                raise Exception(f"No suitable stdio client found for tool: #{tool_name}")
+                                raise Exception(f"No suitable stdio client found for tool: #{tool_name}") # <<======== EXCEPTION
 
-                            claude_client.append_to_messages({
+                            claude_client.append_to_messages({ # <<======== MUTATE:BEGIN (claude_client)
                                 "role": "assistant",
                                 "content": assistant_message_content
-                            })
-                            claude_client.append_to_messages({
+                            }) # <<======== MUTATE:END (claude_client)
+                            claude_client.append_to_messages({ # <<======== MUTATE:BEGIN (claude_client)
                                 "role": "user",
                                 "content": [
                                     {
@@ -246,18 +240,87 @@ async def main():
                                         "content": result
                                     }
                                 ]
-                            })
+                            }) # <<======== MUTATE:END (claude_client)
                             continue_loop = True
 
 
             except Exception as e:
-                print(f"\nError: {str(e)}")
+                print(f"\nError: {str(e)}") # <<======== OUTPUT
 
     finally:
         for client in stdio_clients:
-            await client.cleanup()
+            await client.cleanup() # <<======== DISCONNECT_MCP_SERVER
+
+### ======================== "DELIMITED" STUFF BEGINS ========================
+
+# DONE: detect impure parts (with side effects)
+# I-AM-HERE: to delimit them!
+
+def IO(io_type, *params):
+    res = yield {"io_type": io_type, "params": params}
+    return res
+
+def purefunction(query) -> dict:
+    prepared_query = query.strip().lower()
+    if prepared_query == '/quit':
+        return {"io_type": "quit"}
+    if prepared_query == '':
+        return {"io_type": "skip"}
+    return {"io_type": "chat"}
+
+def replbody(q=None):
+    if q is None:
+        q = yield from IO("read")
+
+    processed_q = purefunction(q)
+
+    if processed_q["io_type"] == "quit":
+        return None
+
+    if processed_q["io_type"] == "skip":
+        yield from replbody()
+
+    if processed_q["io_type"] == "chat":
+        yield from IO("chat", q)
+        yield from replbody()
+
+async def dmain():
+    computation = replbody()
+    io = None
+
+    claude_client = ClaudeClient()
+
+    print("\nSimple dummy Claude client Started!")
+    print("Type your queries or '/quit' to exit.")
+
+    while True:
+        try:
+            if io is None:
+                io = next(computation)
+
+            if io["io_type"] == "chat":
+                claude_client.flush_messages()
+                claude_client.append_to_messages({
+                    "role": "user",
+                    "content": io["params"][0]
+                })
+                response = await claude_client.process_query()
+                for content in response:
+                    print(content.text)
+                io = next(computation)
+            elif io["io_type"] == "read":
+                io = computation.send(input("Specify query:"))
+        except StopIteration:
+            break
+
+
+### ======================== "DELIMITED" STUFF ENDS ========================
+
+
+# if __name__ == "__main__":
+#     dmain()
 
 
 if __name__ == "__main__":
     import sys
-    asyncio.run(main())
+    asyncio.run(dmain())
