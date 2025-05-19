@@ -262,11 +262,20 @@ def IO(io_type, *params):
 
 def purefunction(query) -> dict:
     prepared_query = query.strip().lower()
-    if prepared_query == '/quit':
-        return {"io_type": "quit"}
+
     if prepared_query == '':
         return {"io_type": "skip"}
-    return {"io_type": "chat"}
+
+    if prepared_query[0] == '/':
+        if prepared_query == '/quit':
+            return {"io_type": "quit"}
+        elif prepared_query == '/list_tools':
+            return {"io_type": "list_tools"}
+        else:
+            return {"io_type": "wrong_command"}
+    else:
+        return {"io_type": "chat"}
+
 
 def replbody(q=None):
     if q is None:
@@ -278,11 +287,19 @@ def replbody(q=None):
         return None
 
     if processed_q["io_type"] == "skip":
-        yield from replbody()
+        pass
+
+    if processed_q["io_type"] == "list_tools":
+        tool_list = yield from IO("list_tools")
+        yield from IO("print", tool_list)
 
     if processed_q["io_type"] == "chat":
         yield from IO("chat", q)
-        yield from replbody()
+
+    if processed_q["io_type"] == "wrong_command":
+        yield from IO("print", f"Wrong command: {q}")
+
+    yield from replbody()
 
 async def dmain():
     computation = replbody()
@@ -308,6 +325,11 @@ async def dmain():
                 for content in response:
                     print(content.text)
                 io = next(computation)
+            elif io["io_type"] == "print":
+                print(io["params"][0])
+                io = next(computation)
+            elif io["io_type"] == "list_tools":
+                io = computation.send([])
             elif io["io_type"] == "read":
                 io = computation.send(input("Specify query:"))
         except StopIteration:
