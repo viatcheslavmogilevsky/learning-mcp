@@ -254,7 +254,6 @@ async def main():
 ### ======================== "DELIMITED" STUFF BEGINS ========================
 
 # DONE: detect impure parts (with side effects)
-# I-AM-HERE: to delimit them!
 
 def IO(io_type, *params):
     res = yield {"io_type": io_type, "params": params}
@@ -271,6 +270,14 @@ def purefunction(query) -> dict:
             return {"io_type": "quit"}
         elif prepared_query == '/list_tools':
             return {"io_type": "list_tools"}
+        elif prepared_query == '/launch_stdio':
+            return {"io_type": "launch_stdio"}
+        elif prepared_query == '/call_tool':
+            pass
+        elif prepared_query == '/describe_tool':
+            pass
+        elif prepared_query == '/generate_tool':
+            pass
         else:
             return {"io_type": "wrong_command"}
     else:
@@ -279,7 +286,7 @@ def purefunction(query) -> dict:
 
 def replbody(q=None):
     if q is None:
-        q = yield from IO("read")
+        q = yield from IO("read", "Specify query:")
 
     processed_q = purefunction(q)
 
@@ -294,7 +301,15 @@ def replbody(q=None):
         yield from IO("print", tool_list)
 
     if processed_q["io_type"] == "chat":
-        yield from IO("chat", q)
+        tool_list = yield from IO("list_tools")
+        response = yield from IO("chat", q, tool_list)
+        for content in response:
+            yield from IO("print", content.text)
+
+    if processed_q["io_type"] == "launch_stdio":
+        # I-AM-HERE: add more commands
+        # ideas: recursive accum?
+        yield from IO("print", f"Not supported yet: {q}")
 
     if processed_q["io_type"] == "wrong_command":
         yield from IO("print", f"Wrong command: {q}")
@@ -321,17 +336,15 @@ async def dmain():
                     "role": "user",
                     "content": io["params"][0]
                 })
-                response = await claude_client.process_query()
-                for content in response:
-                    print(content.text)
-                io = next(computation)
+                response = await claude_client.process_query(io["params"][1])
+                io = computation.send(response)
             elif io["io_type"] == "print":
                 print(io["params"][0])
                 io = next(computation)
             elif io["io_type"] == "list_tools":
                 io = computation.send([])
             elif io["io_type"] == "read":
-                io = computation.send(input("Specify query:"))
+                io = computation.send(input(io["params"][0]))
         except StopIteration:
             break
 
